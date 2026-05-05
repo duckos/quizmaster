@@ -16,6 +16,10 @@ import {
 } from '#pages/index.ts'
 import type { AnswerSpec, QuestionSpec } from '#steps/shared/specs.ts'
 
+export interface AiAssistantRequest {
+    readonly question: string
+}
+
 export class QuizmasterWorld {
     constructor(
         public page: Page,
@@ -90,6 +94,8 @@ export class QuizmasterWorld {
     clockInstalled = false
     lastAnsweredTitle?: string
     rememberedAiQuestion = ''
+    lastAiAssistantInstruction = ''
+    lastAiAssistantRequest: AiAssistantRequest | undefined = undefined
 
     parseAnswers(answersString: string) {
         return answersString.split(',').map(answer => answer.trim())

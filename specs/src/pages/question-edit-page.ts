@@ -140,6 +140,8 @@ export class QuestionEditPage {
     expectEasyNotVisible = () => expect(this.isEasyLocator()).not.toBeVisible()
     expectExplanationFieldsExist = () => expect(this.explanationFieldsLocator().first()).toBeVisible()
 
+    expectAiBlockVisible = () => expect(this.robinButtonLocator()).toBeVisible()
+    expectAiBlockNotVisible = () => expect(this.robinButtonLocator()).not.toBeVisible()
     expectNoExplanationFields = () => expect(this.explanationFieldsLocator()).toHaveCount(0)
     expectAnswerRowCount = (count: number) => expect(this.answerRowsLocator()).toHaveCount(count)
     expectAnswerRowCountGreaterThanOrEqual = async (count: number) =>

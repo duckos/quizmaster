@@ -28,6 +28,25 @@ import {
     expectErrorMessages,
 } from '#steps/question/expects.ts'
 import { parseAnswerTable } from '#steps/shared/parsers.ts'
+import type { AiAssistantRequest } from '#steps/world/world.ts'
+
+const stubbedAiAssistantResponse = {
+    question: 'What is the capital of Czech Republic?',
+    answers: ['Brno', 'Prague', 'Berlin', 'Ostrava', 'Bratislava'],
+    correctAnswers: [1],
+    explanations: ['No Brno', 'Yes', 'Germany', 'No', 'No'],
+    questionExplanation: 'Czechia is a country in Europe. Czechs love beer.',
+}
+
+const requireLastAiAssistantPrompt = (request: AiAssistantRequest | undefined): string => {
+    if (!request) throw new Error('No AI assistant request was captured')
+    return request.question
+}
+
+const expectPromptToContainCorrectAnswerIndex = (prompt: string, index: number) => {
+    expect(prompt).toMatch(/correct\s*answers?|correctAnswers|correct answer indexes/i)
+    expect(prompt).toMatch(new RegExp(`\\b${index}\\b`))
+}
 
 Given('I start creating a new question', async function () {
     await ensureWorkspace(this)
@@ -254,23 +273,52 @@ When('I ask AI:', async function (dataTable: DataTable) {
         this.page.waitForResponse(response => response.url().includes('/api/ai-assistant') && response.ok(), {
             timeout: 60_000,
         }),
-        this.robinSheetPage.generate(),
+        this.questionEditPage.clickAiAssist(),
     ])
 })
 
-When(
-    /I ask AI for (single choice|multiple choice|numerical) question:/,
-    async function (choice: string, dataTable: DataTable) {
-        await selectAIQuestionType(this, choice as AIQuestionTypeChoice)
-        await enterAIPrompt(this, toText(dataTable))
-        await Promise.all([
-            this.page.waitForResponse(response => response.url().includes('/api/ai-assistant') && response.ok(), {
-                timeout: 60_000,
-            }),
-            this.robinSheetPage.generate(),
-        ])
-    },
-)
+When('I ask stubbed AI to {string}', async function (instruction: string) {
+    this.lastAiAssistantInstruction = instruction
+    this.lastAiAssistantRequest = undefined
+
+    await this.page.route('**/api/ai-assistant', async route => {
+        this.lastAiAssistantRequest = route.request().postDataJSON() as AiAssistantRequest
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(stubbedAiAssistantResponse),
+        })
+    })
+
+    await enterAIPrompt(this, instruction)
+    await Promise.all([
+        this.page.waitForResponse(response => response.url().includes('/api/ai-assistant') && response.ok(), {
+            timeout: 60_000,
+        }),
+        this.questionEditPage.clickAiAssist(),
+    ])
+})
+
+Then('AI received current question context', function () {
+    const prompt = requireLastAiAssistantPrompt(this.lastAiAssistantRequest)
+
+    expect(prompt).toContain(this.lastAiAssistantInstruction)
+    expect(prompt).toContain('What is the capital of Czech Republic?')
+    expect(prompt).toContain('Brno')
+    expect(prompt).toContain('Prague')
+    expect(prompt).toContain('Berlin')
+    expectPromptToContainCorrectAnswerIndex(prompt, 1)
+})
+
+Then('AI received current question context with question {string}', function (question: string) {
+    const prompt = requireLastAiAssistantPrompt(this.lastAiAssistantRequest)
+    expect(prompt).toContain(question)
+})
+
+Then('AI received current question context with answer {string}', function (answer: string) {
+    const prompt = requireLastAiAssistantPrompt(this.lastAiAssistantRequest)
+    expect(prompt).toContain(answer)
+})
 
 Given('I start creating a new question when I already have generated content', async function () {
     await ensureWorkspace(this)
